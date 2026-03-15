@@ -20,6 +20,11 @@ start_date = end_date - datetime.timedelta(days=5*365)
 @st.cache_data
 def load_data(ticker, start, end):
     data = yf.download(ticker, start=start, end=end, progress=False)
+    
+    # Flatten multi-index columns if present so PyArrow can serialize it
+    if isinstance(data.columns, pd.MultiIndex):
+        data.columns = ['_'.join(col).strip() for col in data.columns.values]
+    
     return data
 
 with st.spinner('Downloading 5 years of silver price data...'):
@@ -29,14 +34,13 @@ with st.spinner('Downloading 5 years of silver price data...'):
             st.error('Failed to download data.')
             st.stop()
             
-        # Parse close price
-        if isinstance(data.columns, pd.MultiIndex):
-            if ticker in data['Close'].columns:
-                close_series = data['Close'][ticker]
-            else:
-                close_series = data['Close'].iloc[:, 0]
+        # Find the Close price column (could be 'Close_SI=F' or just 'Close')
+        close_col = [c for c in data.columns if 'Close' in c]
+        if close_col:
+            close_series = data[close_col[0]]
         else:
-            close_series = data['Close']
+            close_series = data.iloc[:, 0]
+
             
         df = pd.DataFrame({'Date': data.index, 'Close': close_series.values})
         df = df.dropna()

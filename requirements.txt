@@ -5,4 +5,3 @@ streamlit
 scikit-learn
 statsmodels
 plotly
-altair
